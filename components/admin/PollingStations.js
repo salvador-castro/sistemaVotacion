@@ -1,13 +1,15 @@
-// components/admin/PollingStations.js - Agregar función de validación
+// components/admin/PollingStations.js
 import { useState, useEffect } from 'react';
 
 export default function PollingStations({ pollingStations, onToggleStation, onAddStation }) {
   const [stations, setStations] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [newStation, setNewStation] = useState({
     name: '',
     location: '',
-    president: ''
+    presidentName: '',
+    presidentDNI: ''
   });
 
   useEffect(() => {
@@ -31,6 +33,18 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
       return;
     }
 
+    if (!newStation.presidentDNI) {
+      alert('Por favor ingrese el DNI del presidente de mesa');
+      return;
+    }
+
+    // Validar formato de DNI (8 dígitos numéricos)
+    const dniRegex = /^\d{8}$/;
+    if (!dniRegex.test(newStation.presidentDNI)) {
+      alert('❌ Error: El DNI debe contener exactamente 8 dígitos numéricos');
+      return;
+    }
+
     // Validar si la mesa ya existe hoy
     if (isStationDuplicate(newStation.name, newStation.location)) {
       alert('❌ Error: Ya existe una mesa con ese nombre y ubicación creada hoy');
@@ -41,7 +55,8 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
       id: Date.now(),
       name: newStation.name,
       location: newStation.location,
-      president: newStation.president,
+      president: newStation.presidentName,
+      presidentDNI: newStation.presidentDNI,
       isOpen: false,
       voters: 0,
       createdAt: new Date().toISOString(),
@@ -56,7 +71,7 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
     
     // Cerrar modal y resetear formulario
     setShowCreateModal(false);
-    setNewStation({ name: '', location: '', president: '' });
+    setNewStation({ name: '', location: '', presidentName: '', presidentDNI: '' });
     
     alert(`✅ Mesa "${station.name}" creada correctamente`);
   };
@@ -85,6 +100,18 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
         }
       }
     });
+  };
+
+  const handleDeleteAllStations = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteAllStations = () => {
+    // Eliminar todas las mesas del localStorage
+    localStorage.removeItem('pollingStations');
+    
+    // Recargar la página para actualizar el estado
+    window.location.reload();
   };
 
   const handleToggleStation = (stationId) => {
@@ -142,6 +169,12 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                 >
                   Cerrar Todas
                 </button>
+                <button
+                  onClick={handleDeleteAllStations}
+                  className="bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 text-sm"
+                >
+                  Borrar Todas
+                </button>
               </>
             )}
           </div>
@@ -151,7 +184,7 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
       {/* Modal para crear mesa */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
+          <div className="bg-white rounded-lg p-6 w-96 max-h-90vh overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Crear Nueva Mesa</h3>
             
             <div className="space-y-4">
@@ -183,15 +216,32 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Presidente (Opcional)
+                  Nombre del Presidente (Opcional)
                 </label>
                 <input
                   type="text"
-                  value={newStation.president}
-                  onChange={(e) => setNewStation({...newStation, president: e.target.value})}
-                  placeholder="Nombre del presidente de mesa"
+                  value={newStation.presidentName}
+                  onChange={(e) => setNewStation({...newStation, presidentName: e.target.value})}
+                  placeholder="Nombre completo del presidente"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  DNI del Presidente *
+                </label>
+                <input
+                  type="text"
+                  value={newStation.presidentDNI}
+                  onChange={(e) => setNewStation({...newStation, presidentDNI: e.target.value.replace(/\D/g, '')})}
+                  placeholder="12345678 (8 dígitos)"
+                  maxLength="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Solo números, sin puntos ni espacios
+                </p>
               </div>
             </div>
 
@@ -219,6 +269,47 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
         </div>
       )}
 
+      {/* Modal de confirmación para borrar todas las mesas */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4 text-red-600">⚠️ Confirmar Eliminación</h3>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                <strong>¿Está seguro de que desea eliminar TODAS las mesas?</strong>
+              </p>
+              <p className="text-sm text-gray-600 mb-2">
+                Esta acción eliminará:
+              </p>
+              <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
+                <li>Todas las mesas creadas hoy ({todayStations.length} mesas)</li>
+                <li>Todo el historial de apertura/cierre</li>
+                <li>Los datos de los presidentes asignados</li>
+              </ul>
+              <p className="text-sm text-red-600 mt-3 font-semibold">
+                ⚠️ Esta acción no se puede deshacer
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteAllStations}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Sí, Eliminar Todas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lista de Mesas del Día */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -232,6 +323,9 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Presidente
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                DNI Presidente
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
@@ -250,7 +344,7 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
           <tbody className="bg-white divide-y divide-gray-200">
             {todayStations.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
                   No hay mesas creadas para hoy. Haga click en "Crear Nueva Mesa" para comenzar.
                 </td>
               </tr>
@@ -269,6 +363,11 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {station.president || 'No asignado'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-mono text-gray-900">
+                      {station.presidentDNI || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
