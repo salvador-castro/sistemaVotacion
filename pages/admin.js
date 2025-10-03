@@ -168,12 +168,9 @@ export default function Admin() {
   };
 
   const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('voters');
-    localStorage.removeItem('pollingStations');
-    localStorage.removeItem('votingConfig');
-    window.location.href = '/login';
-  };
+  localStorage.removeItem('user');
+  window.location.href = '/login';
+};
 
   if (loading) {
     return (
@@ -261,13 +258,14 @@ export default function Admin() {
             />
           )}
           
-          {activeTab === 'stations' && (
-            <PollingStations 
-                pollingStations={pollingStations}
-                onToggleStation={togglePollingStation}
-                onAddStation={addPollingStation} // <- Agregar esta prop
-            />
-            )}
+        {activeTab === 'stations' && (
+        <PollingStations 
+            pollingStations={pollingStations}
+            onToggleStation={togglePollingStation}
+            onAddStation={addPollingStation}
+            votingConfig={votingConfig} // <- Agregar esta prop
+        />
+        )}
           
           {activeTab === 'settings' && (
             <VotingSettings 

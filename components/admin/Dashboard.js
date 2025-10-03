@@ -5,9 +5,27 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
   const enabledVoters = voters.filter(v => v.enabled).length;
   const votedVoters = voters.filter(v => v.voted).length;
   const participation = totalVoters > 0 ? Math.round((votedVoters / totalVoters) * 100) : 0;
+
+  // Calcular distribución REAL por sede basada en las mesas
+  const getTodayStations = () => {
+    if (!pollingStations || pollingStations.length === 0) return [];
+    const today = new Date().toDateString();
+    return pollingStations.filter(station => {
+      const stationDate = new Date(station.createdAt).toDateString();
+      return stationDate === today;
+    });
+  };
+
+  const todayStations = getTodayStations();
   
-  const medranoVotes = Math.floor(votedVoters * 0.6);
-  const campusVotes = votedVoters - medranoVotes;
+  // Calcular votos por sede REALES
+  const medranoVotes = todayStations
+    .filter(station => station.location.toLowerCase().includes('medrano'))
+    .reduce((total, station) => total + station.voters, 0);
+  
+  const campusVotes = todayStations
+    .filter(station => station.location.toLowerCase().includes('campus'))
+    .reduce((total, station) => total + station.voters, 0);
 
   const stats = {
     totalVoters,
@@ -18,16 +36,6 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
     medranoVotes,
     campusVotes
   };
-  const getTodayStations = () => {
-  if (!pollingStations || pollingStations.length === 0) return [];
-  const today = new Date().toDateString();
-  return pollingStations.filter(station => {
-    const stationDate = new Date(station.createdAt).toDateString();
-    return stationDate === today;
-  });
-};
-
-  const todayStations = getTodayStations();
 
   const isVotingActive = () => {
     if (!votingConfig?.isEnabled) return false;
@@ -106,14 +114,16 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
           </div>
         </div>
 
-        {/* Distribución por Sede */}
+        {/* Distribución por Sede - CORREGIDA */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4 text-gray-900">Distribución por Sede</h3>
           <div className="space-y-3">
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm font-medium text-gray-700">Medrano</span>
-                <span className="text-sm font-semibold text-gray-900">{stats.medranoVotes} votos</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {stats.medranoVotes} votos ({todayStations.filter(s => s.location.toLowerCase().includes('medrano')).length} mesas)
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
@@ -125,7 +135,9 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm font-medium text-gray-700">Campus</span>
-                <span className="text-sm font-semibold text-gray-900">{stats.campusVotes} votos</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {stats.campusVotes} votos ({todayStations.filter(s => s.location.toLowerCase().includes('campus')).length} mesas)
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
@@ -134,6 +146,11 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
                 ></div>
               </div>
             </div>
+            {stats.totalVotes === 0 && (
+              <p className="text-sm text-gray-500 text-center mt-2">
+                No hay votos registrados aún
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -156,11 +173,13 @@ export default function AdminDashboard({ voters, pollingStations, votingConfig }
                 {todayStations.filter(s => s.isOpen).length} de {todayStations.length}
             </span>
           </div>
+          <div className="flex justify-between py-2 border-b">
+            <span className="text-gray-700">Votos en Medrano:</span>
+            <span className="font-semibold text-green-600">{stats.medranoVotes}</span>
+          </div>
           <div className="flex justify-between py-2">
-            <span className="text-gray-700">Estado del sistema:</span>
-            <span className={`font-semibold ${isVotingActive() ? 'text-green-600' : 'text-red-600'}`}>
-              {isVotingActive() ? 'Votación Activa' : 'Votación Inactiva'}
-            </span>
+            <span className="text-gray-700">Votos en Campus:</span>
+            <span className="font-semibold text-blue-600">{stats.campusVotes}</span>
           </div>
         </div>
       </div>
