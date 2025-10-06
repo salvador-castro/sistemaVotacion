@@ -9,6 +9,8 @@ export default function PresidentPanel() {
     const [searchDni, setSearchDni] = useState('');
     const [currentVoter, setCurrentVoter] = useState(null);
     const [showVoterInfo, setShowVoterInfo] = useState(false);
+    const [votingActive, setVotingActive] = useState(true);
+    const [votingStatus, setVotingStatus] = useState('');
 
     useEffect(() => {
         // Verificar sesión
@@ -53,6 +55,9 @@ export default function PresidentPanel() {
                 setVoters(JSON.parse(savedVoters));
             }
 
+            // Verificar período de votación
+            checkVotingPeriod();
+
         } catch (error) {
             localStorage.removeItem('presidentSession');
             window.location.href = '/login-president';
@@ -61,7 +66,30 @@ export default function PresidentPanel() {
         }
     }, []);
 
+    // Verificar período de votación
+    const checkVotingPeriod = async () => {
+        try {
+            const response = await fetch('/api/check-voting-period');
+            const status = await response.json();
+
+            setVotingActive(status.active);
+            if (!status.active) {
+                setVotingStatus(status.reason);
+            }
+        } catch (error) {
+            console.error('Error verificando período:', error);
+            setVotingActive(false);
+            setVotingStatus('Error al verificar el período de votación');
+        }
+    };
+
     const handleSearchVoter = () => {
+        // Verificar si está en período de votación
+        if (!votingActive) {
+            alert(`⏰ No se puede registrar votos: ${votingStatus}`);
+            return;
+        }
+
         if (!searchDni) {
             alert('Por favor ingrese un DNI');
             return;
@@ -91,6 +119,14 @@ export default function PresidentPanel() {
 
     const confirmVote = () => {
         if (!currentVoter) return;
+
+        // Verificar nuevamente si está en período de votación
+        if (!votingActive) {
+            alert(`⏰ No se puede registrar votos: ${votingStatus}`);
+            setShowVoterInfo(false);
+            setCurrentVoter(null);
+            return;
+        }
 
         // Marcar como votado
         const updatedVoters = voters.map(v =>
@@ -124,7 +160,6 @@ export default function PresidentPanel() {
     };
 
     const logout = () => {
-
         localStorage.removeItem('presidentSession');
         window.location.href = '/login-president';
     };
@@ -173,6 +208,25 @@ export default function PresidentPanel() {
                 </div>
             </header>
 
+            {/* Alerta si no está en período de votación */}
+            {!votingActive && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <span className="text-red-400">⏰</span>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-red-700">
+                                <strong>Fuera del período de votación:</strong> {votingStatus}
+                            </p>
+                            <p className="text-red-600 text-sm mt-1">
+                                No se pueden registrar votos fuera del período establecido.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
                 <div className="px-4 py-6 sm:px-0">
                     {/* Estadísticas de la Mesa */}
@@ -181,10 +235,17 @@ export default function PresidentPanel() {
                             <h3 className="text-lg font-semibold text-blue-800">Votos Registrados</h3>
                             <p className="text-3xl font-bold text-blue-600 mt-2">{mesa.voters}</p>
                         </div>
-                        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-                            <h3 className="text-lg font-semibold text-green-800">Estado Mesa</h3>
-                            <p className="text-3xl font-bold text-green-600 mt-2">
-                                {mesa.isOpen ? 'ABIERTA' : 'CERRADA'}
+                        <div className={`p-6 rounded-lg border ${votingActive
+                                ? 'bg-green-50 border-green-200'
+                                : 'bg-yellow-50 border-yellow-200'
+                            }`}>
+                            <h3 className={`text-lg font-semibold ${votingActive ? 'text-green-800' : 'text-yellow-800'
+                                }`}>
+                                Estado Votación
+                            </h3>
+                            <p className={`text-2xl font-bold mt-2 ${votingActive ? 'text-green-600' : 'text-yellow-600'
+                                }`}>
+                                {votingActive ? 'ACTIVA' : 'INACTIVA'}
                             </p>
                         </div>
                         <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
@@ -208,18 +269,26 @@ export default function PresidentPanel() {
                                     placeholder="Ingrese DNI del votante"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     maxLength="8"
+                                    disabled={!votingActive}
                                 />
                             </div>
                             <button
                                 onClick={handleSearchVoter}
-                                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                                disabled={!votingActive}
+                                className={`px-6 py-2 rounded-md ${votingActive
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    }`}
                             >
-                                Buscar Votante
+                                {votingActive ? 'Buscar Votante' : 'Votación Inactiva'}
                             </button>
                         </div>
 
                         <p className="text-sm text-gray-500 mt-2">
-                            Ingrese el DNI (solo números) para verificar y registrar el voto
+                            {votingActive
+                                ? 'Ingrese el DNI (solo números) para verificar y registrar el voto'
+                                : `No se pueden registrar votos: ${votingStatus}`
+                            }
                         </p>
                     </div>
 
@@ -258,6 +327,15 @@ export default function PresidentPanel() {
                                             <strong>⚠️ Verifique que los datos coincidan con el documento del votante</strong>
                                         </p>
                                     </div>
+
+                                    {/* Mostrar estado actual de la votación en el modal */}
+                                    {!votingActive && (
+                                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                            <p className="text-sm text-red-800">
+                                                <strong>⏰ Alerta:</strong> La votación ya no está activa: {votingStatus}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end space-x-3">
@@ -269,9 +347,13 @@ export default function PresidentPanel() {
                                     </button>
                                     <button
                                         onClick={confirmVote}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                                        disabled={!votingActive}
+                                        className={`px-4 py-2 rounded-md ${votingActive
+                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                            }`}
                                     >
-                                        Confirmar Voto
+                                        {votingActive ? 'Confirmar Voto' : 'Votación Inactiva'}
                                     </button>
                                 </div>
                             </div>
@@ -289,7 +371,13 @@ export default function PresidentPanel() {
                             </div>
                             <div>
                                 <p><strong>DNI Presidente:</strong> {mesa.presidentDNI}</p>
-                                <p><strong>Estado:</strong> <span className="text-green-600 font-semibold">Abierta</span></p>
+                                <p><strong>Estado Mesa:</strong> <span className="text-green-600 font-semibold">Abierta</span></p>
+                                <p><strong>Estado Votación:</strong>
+                                    <span className={`font-semibold ml-2 ${votingActive ? 'text-green-600' : 'text-red-600'
+                                        }`}>
+                                        {votingActive ? 'ACTIVA' : 'INACTIVA'}
+                                    </span>
+                                </p>
                                 <p><strong>Hora apertura:</strong> {mesa.openedAt ? new Date(mesa.openedAt).toLocaleString('es-ES') : 'No abierta'}</p>
                             </div>
                         </div>
@@ -303,6 +391,7 @@ export default function PresidentPanel() {
                             <li>• Verifique que los datos coincidan con el documento de identidad</li>
                             <li>• Confirme el voto solo después de verificar la identidad</li>
                             <li>• Cada DNI solo puede votar una vez</li>
+                            <li>• La votación solo está activa durante el período y horario establecido</li>
                             <li>• En caso de duda, contacte al administrador del sistema o fiscales generales</li>
                         </ul>
                     </div>

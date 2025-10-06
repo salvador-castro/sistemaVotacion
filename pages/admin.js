@@ -7,12 +7,39 @@ import ImportVoters from '../components/admin/ImportVoters';
 import VotingSettings from '../components/admin/VotingSettings';
 import PollingStations from '../components/admin/PollingStations';
 
+// Función para adaptar la configuración de la base de datos al formato esperado por PollingStations
+const adaptVotingConfig = (dbConfig) => {
+    if (!dbConfig) return null;
+
+    // Verificar si ya está en el formato nuevo (por si acaso)
+    if (dbConfig.isEnabled !== undefined) {
+        return dbConfig;
+    }
+
+    // Adaptar desde el formato de base de datos
+    const adaptedConfig = {
+        isEnabled: dbConfig.system_status?.value === 'active',
+        startDate: dbConfig.voting_start_date?.value,
+        endDate: dbConfig.voting_end_date?.value,
+        startTime: dbConfig.voting_schedule_start?.value,
+        endTime: dbConfig.voting_schedule_end?.value,
+        allowedDays: dbConfig.allowed_voting_days?.value
+            ? dbConfig.allowed_voting_days.value.split(',').map(day => parseInt(day.trim()))
+            : [1, 2, 3, 4, 5, 6], // Por defecto: Lunes a Sábado
+        maxVotesPerTable: parseInt(dbConfig.max_votes_per_table?.value) || 200
+    };
+
+    console.log('Configuración adaptada:', adaptedConfig);
+    return adaptedConfig;
+};
+
 export default function Admin() {
     const [user, setUser] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [voters, setVoters] = useState([]);
     const [pollingStations, setPollingStations] = useState([]);
     const [votingConfig, setVotingConfig] = useState(null);
+    const [adaptedVotingConfig, setAdaptedVotingConfig] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Función para cargar votantes desde la base de datos
@@ -52,6 +79,16 @@ export default function Admin() {
             if (savedConfig) setVotingConfig(JSON.parse(savedConfig));
         }
     };
+
+    // Efecto para adaptar la configuración cuando cambie
+    useEffect(() => {
+        if (votingConfig) {
+            const adapted = adaptVotingConfig(votingConfig);
+            setAdaptedVotingConfig(adapted);
+        } else {
+            setAdaptedVotingConfig(null);
+        }
+    }, [votingConfig]);
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -210,6 +247,14 @@ export default function Admin() {
         localStorage.setItem('votingConfig', JSON.stringify(newConfig));
     };
 
+    // Función temporal para debug
+    const debugConfig = () => {
+        console.log('=== DEBUG CONFIGURACIÓN ===');
+        console.log('Configuración original (BD):', votingConfig);
+        console.log('Configuración adaptada:', adaptedVotingConfig);
+        console.log('==========================');
+    };
+
     const logout = () => {
         localStorage.removeItem('user');
         localStorage.removeItem('votingConfig'); // Limpiar backup
@@ -242,6 +287,12 @@ export default function Admin() {
                             <p className="text-gray-600">Super Administrador</p>
                         </div>
                         <div className="flex items-center space-x-4">
+                            <button
+                                onClick={debugConfig}
+                                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 text-sm"
+                            >
+                                Debug Config
+                            </button>
                             <span className="text-gray-700">
                                 {user.nombre} {user.apellido}
                             </span>
@@ -290,7 +341,7 @@ export default function Admin() {
                         <AdminDashboard
                             voters={voters}
                             pollingStations={pollingStations}
-                            votingConfig={votingConfig}
+                            votingConfig={adaptedVotingConfig}
                         />
                     )}
 
@@ -307,7 +358,7 @@ export default function Admin() {
                             pollingStations={pollingStations}
                             onToggleStation={togglePollingStation}
                             onAddStation={addPollingStation}
-                            votingConfig={votingConfig}
+                            votingConfig={adaptedVotingConfig}
                         />
                     )}
 

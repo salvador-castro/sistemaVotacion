@@ -1,142 +1,128 @@
 // pages/login-president.js
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 
 export default function LoginPresident() {
     const [dni, setDni] = useState('');
-    const [mesaId, setMesaId] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const router = useRouter();
 
-    const handleLogin = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
+        setError('');
 
-        // Validaciones básicas
-        if (!dni || !mesaId) {
-            alert('Por favor complete DNI y código de mesa');
-            return;
+        try {
+            // Primero verificar si el período de votación está activo
+            const votingStatusResponse = await fetch('/api/check-voting-period');
+            const votingStatus = await votingStatusResponse.json();
+
+            if (!votingStatus.active) {
+                setError(`⏰ ${votingStatus.reason}`);
+                setLoading(false);
+                return;
+            }
+
+            // Si el período está activo, proceder con el login
+            const response = await fetch('/api/auth/president', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ dni, password }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Guardar datos del usuario en localStorage
+                localStorage.setItem('user', JSON.stringify(data.user));
+                localStorage.setItem('token', data.token);
+
+                // Redirigir al panel del presidente
+                router.push('/president-dashboard');
+            } else {
+                setError(data.error || 'Error en el login');
+            }
+        } catch (error) {
+            console.error('Error en login:', error);
+            setError('Error de conexión');
+        } finally {
+            setLoading(false);
         }
-
-        // Buscar la mesa en localStorage
-        const pollingStations = JSON.parse(localStorage.getItem('pollingStations') || '[]');
-        const today = new Date().toDateString();
-
-        const mesa = pollingStations.find(station => {
-            const stationDate = new Date(station.createdAt).toDateString();
-            return stationDate === today &&
-                station.id === parseInt(mesaId) &&
-                station.presidentDNI === dni;
-        });
-
-        if (!mesa) {
-            alert('❌ Credenciales inválidas. Verifique:\n• DNI del presidente\n• Código de mesa\n• Que la mesa esté asignada a usted');
-            return;
-        }
-
-        if (!mesa.isOpen) {
-            alert('❌ La mesa no está abierta. Contacte al administrador.');
-            return;
-        }
-
-        // Guardar sesión de presidente
-        const presidentSession = {
-            role: 'president',
-            mesaId: mesa.id,
-            mesaName: mesa.name,
-            location: mesa.location,
-            presidentDNI: dni,
-            presidentName: mesa.president,
-            loggedInAt: new Date().toISOString()
-        };
-
-        localStorage.setItem('presidentSession', JSON.stringify(presidentSession));
-        window.location.href = '/president';
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-            <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Acceso Presidentes de Mesa
-                </h2>
-                <p className="mt-2 text-center text-sm text-gray-600">
-                    Ingrese sus credenciales proporcionadas por el administrador
-                </p>
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8">
+                <div>
+                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                        Acceso Presidente de Mesa
+                    </h2>
+                    <p className="mt-2 text-center text-sm text-gray-600">
+                        Ingrese sus credenciales para acceder al sistema
+                    </p>
+                </div>
 
-            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-                    <form className="space-y-6" onSubmit={handleLogin}>
+                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="rounded-md shadow-sm -space-y-px">
                         <div>
-                            <label htmlFor="dni" className="block text-sm font-medium text-gray-700">
-                                DNI del Presidente
+                            <label htmlFor="dni" className="sr-only">
+                                DNI
                             </label>
-                            <div className="mt-1">
-                                <input
-                                    id="dni"
-                                    name="dni"
-                                    type="text"
-                                    required
-                                    value={dni}
-                                    onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
-                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="12345678"
-                                    maxLength="8"
-                                />
-                            </div>
+                            <input
+                                id="dni"
+                                name="dni"
+                                type="text"
+                                required
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                                placeholder="DNI"
+                                value={dni}
+                                onChange={(e) => setDni(e.target.value)}
+                            />
                         </div>
-
                         <div>
-                            <label htmlFor="mesaId" className="block text-sm font-medium text-gray-700">
-                                Código de Mesa
+                            <label htmlFor="password" className="sr-only">
+                                Contraseña
                             </label>
-                            <div className="mt-1">
-                                <input
-                                    id="mesaId"
-                                    name="mesaId"
-                                    type="text"
-                                    required
-                                    value={mesaId}
-                                    onChange={(e) => setMesaId(e.target.value.replace(/\D/g, ''))}
-                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Código numérico de la mesa"
-                                />
-                            </div>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Proporcionado por el administrador al crear la mesa
-                            </p>
-                        </div>
-
-                        <div>
-                            <button
-                                type="submit"
-                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Ingresar al Sistema
-                            </button>
-                        </div>
-                    </form>
-
-                    <div className="mt-6">
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-300" />
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-gray-500">
-                                    Información importante
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                            <p className="text-sm text-yellow-800">
-                                <strong>⚠️ Requisitos para acceder:</strong>
-                            </p>
-                            <ul className="text-sm text-yellow-700 mt-1 list-disc list-inside space-y-1">
-                                <li>DNI debe coincidir con el asignado a la mesa</li>
-                                <li>La mesa debe estar abierta por el administrador</li>
-                                <li>Solo puede acceder durante el horario de votación</li>
-                            </ul>
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                                placeholder="Contraseña"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
                         </div>
                     </div>
+
+                    <div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                        >
+                            {loading ? 'Verificando...' : 'Ingresar'}
+                        </button>
+                    </div>
+                </form>
+
+                {/* Información del período de votación */}
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-800">Período de Votación</h3>
+                    <p className="text-xs text-blue-600 mt-1">
+                        Solo puede acceder durante el período y horario establecido para la votación.
+                    </p>
                 </div>
             </div>
         </div>

@@ -97,6 +97,28 @@ export default function VotingSettings({ votingConfig, onUpdateConfig }) {
         }
     };
 
+    const adaptVotingConfig = (dbConfig) => {
+        if (!dbConfig) return null;
+
+        // Verificar si ya está en el formato nuevo
+        if (dbConfig.isEnabled !== undefined) {
+            return dbConfig;
+        }
+
+        // Adaptar desde el formato de base de datos
+        return {
+            isEnabled: dbConfig.system_status?.value === 'active',
+            startDate: dbConfig.voting_start_date?.value,
+            endDate: dbConfig.voting_end_date?.value,
+            startTime: dbConfig.voting_schedule_start?.value,
+            endTime: dbConfig.voting_schedule_end?.value,
+            allowedDays: dbConfig.allowed_voting_days?.value
+                ? dbConfig.allowed_voting_days.value.split(',').map(day => parseInt(day.trim()))
+                : [1, 2, 3, 4, 5], // Por defecto: Lunes a Viernes
+            maxVotesPerTable: parseInt(dbConfig.max_votes_per_table?.value) || 200
+        };
+    };
+
     const handleReset = async () => {
         if (window.confirm('¿Está seguro de que desea restablecer la configuración a los valores por defecto?')) {
             setLoading(true);
@@ -207,7 +229,7 @@ export default function VotingSettings({ votingConfig, onUpdateConfig }) {
     return (
         <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Configuración del Sistema de Votación</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Configuración del Sistema de Votación</h2>
                 <div className="flex space-x-3">
                     <button
                         onClick={handleSave}
@@ -248,8 +270,8 @@ export default function VotingSettings({ votingConfig, onUpdateConfig }) {
                     <button
                         onClick={handleStatusToggle}
                         className={`px-4 py-2 rounded font-semibold ${config.system_status?.value === 'active'
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : 'bg-red-600 text-white hover:bg-red-700'
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-red-600 text-white hover:bg-red-700'
                             }`}
                     >
                         {config.system_status?.value === 'active' ? 'Sistema Activo' : 'Sistema Inactivo'}

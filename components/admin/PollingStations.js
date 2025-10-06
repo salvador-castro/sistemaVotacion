@@ -1,12 +1,39 @@
 // components/admin/PollingStations.js
 import { useState, useEffect } from 'react';
 
+// Función para adaptar la configuración de la base de datos al formato esperado
+const adaptVotingConfig = (dbConfig) => {
+    if (!dbConfig) return null;
+
+    // Verificar si ya está en el formato nuevo
+    if (dbConfig.isEnabled !== undefined) {
+        return dbConfig;
+    }
+
+    // Adaptar desde el formato de base de datos
+    const adaptedConfig = {
+        isEnabled: dbConfig.system_status?.value === 'active',
+        startDate: dbConfig.voting_start_date?.value,
+        endDate: dbConfig.voting_end_date?.value,
+        startTime: dbConfig.voting_schedule_start?.value,
+        endTime: dbConfig.voting_schedule_end?.value,
+        allowedDays: dbConfig.allowed_voting_days?.value
+            ? dbConfig.allowed_voting_days.value.split(',').map(day => parseInt(day.trim()))
+            : [1, 2, 3, 4, 5, 6], // Por defecto: Lunes a Sábado
+        maxVotesPerTable: parseInt(dbConfig.max_votes_per_table?.value) || 200
+    };
+
+    console.log('Configuración adaptada:', adaptedConfig);
+    return adaptedConfig;
+};
+
 export default function PollingStations({ pollingStations, onToggleStation, onAddStation, votingConfig }) {
     const [stations, setStations] = useState([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showChangePresidentModal, setShowChangePresidentModal] = useState(false);
     const [selectedStation, setSelectedStation] = useState(null);
+    const [adaptedConfig, setAdaptedConfig] = useState(null);
     const [newStation, setNewStation] = useState({
         name: '',
         location: '',
@@ -21,32 +48,129 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
 
     useEffect(() => {
         setStations(pollingStations);
+        console.log('PollingStations actualizado:', pollingStations);
     }, [pollingStations]);
+
+    useEffect(() => {
+        if (votingConfig) {
+            const adapted = adaptVotingConfig(votingConfig);
+            setAdaptedConfig(adapted);
+            console.log('Configuración adaptada:', adapted);
+        } else {
+            setAdaptedConfig(null);
+        }
+    }, [votingConfig]);
 
     // Función para verificar si el sistema está activo
     const isSystemActive = () => {
-        if (!votingConfig?.isEnabled) return false;
+        const config = adaptedConfig;
 
-        const now = new Date();
-        const currentDay = now.getDay();
-        const currentTime = now.toTimeString().slice(0, 5);
-
-        // Verificar día permitido
-        if (!votingConfig.allowedDays.includes(currentDay)) return false;
-
-        // Verificar horario
-        if (currentTime < votingConfig.startTime || currentTime > votingConfig.endTime) return false;
-
-        // Verificar fecha
-        if (votingConfig.startDate && votingConfig.endDate) {
-            const start = new Date(votingConfig.startDate);
-            const end = new Date(votingConfig.endDate);
-            end.setHours(23, 59, 59);
-
-            if (now < start || now > end) return false;
+        if (!config) {
+            console.warn('Configuración de votación no disponible');
+            return false;
         }
 
+        // Verificar si el sistema está habilitado
+        if (!config.isEnabled) {
+            console.log('Sistema deshabilitado en configuración');
+            return false;
+        }
+
+        const now = new Date();
+
+        // Verificar fecha de inicio y fin
+        if (config.startDate && config.endDate) {
+            const startDate = new Date(config.startDate);
+            const endDate = new Date(config.endDate);
+            endDate.setHours(23, 59, 59, 999); // Fin del día
+
+            if (now < startDate) {
+                console.log('Sistema no activo: antes de la fecha de inicio');
+                return false;
+            }
+
+            if (now > endDate) {
+                console.log('Sistema no activo: después de la fecha de fin');
+                return false;
+            }
+        }
+
+        // Verificar días permitidos
+        if (config.allowedDays && config.allowedDays.length > 0) {
+            const currentDay = now.getDay();
+            if (!config.allowedDays.includes(currentDay)) {
+                console.log('Sistema no activo: día no permitido', currentDay, 'días permitidos:', config.allowedDays);
+                return false;
+            }
+        }
+
+        // Verificar horario
+        if (config.startTime && config.endTime) {
+            const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS
+
+            // Asegurarse de que los tiempos tengan formato correcto
+            const normalizedStartTime = config.startTime.length === 5 ? config.startTime + ':00' : config.startTime;
+            const normalizedEndTime = config.endTime.length === 5 ? config.endTime + ':00' : config.endTime;
+
+            if (currentTime < normalizedStartTime) {
+                console.log('Sistema no activo: antes del horario de inicio', currentTime, 'inicio:', normalizedStartTime);
+                return false;
+            }
+
+            if (currentTime > normalizedEndTime) {
+                console.log('Sistema no activo: después del horario de fin', currentTime, 'fin:', normalizedEndTime);
+                return false;
+            }
+        }
+
+        console.log('Sistema ACTIVO - Todas las condiciones cumplidas');
         return true;
+    };
+
+    const debugSystemStatus = () => {
+        const config = adaptedConfig;
+
+        if (!config) {
+            console.log('❌ adaptedConfig es null o undefined');
+            console.log('votingConfig original:', votingConfig);
+            return;
+        }
+
+        const now = new Date();
+        console.log('=== DEBUG SISTEMA DE VOTACIÓN ===');
+        console.log('Configuración original:', votingConfig);
+        console.log('Configuración adaptada:', config);
+        console.log('Fecha/hora actual:', now.toLocaleString('es-ES'));
+        console.log('Día de la semana (0=Dom, 1=Lun...):', now.getDay());
+        console.log('isEnabled:', config.isEnabled);
+
+        if (config.startDate && config.endDate) {
+            console.log('Start Date:', config.startDate);
+            console.log('End Date:', config.endDate);
+            console.log('Dentro del rango de fechas:',
+                now >= new Date(config.startDate) && now <= new Date(config.endDate));
+        }
+
+        if (config.allowedDays) {
+            console.log('Día actual:', now.getDay());
+            console.log('Días permitidos:', config.allowedDays);
+            console.log('Día permitido:', config.allowedDays.includes(now.getDay()));
+        }
+
+        if (config.startTime && config.endTime) {
+            const currentTime = now.toTimeString().slice(0, 8);
+            const normalizedStartTime = config.startTime.length === 5 ? config.startTime + ':00' : config.startTime;
+            const normalizedEndTime = config.endTime.length === 5 ? config.endTime + ':00' : config.endTime;
+
+            console.log('Hora actual:', currentTime);
+            console.log('Start Time (normalizado):', normalizedStartTime);
+            console.log('End Time (normalizado):', normalizedEndTime);
+            console.log('Dentro del horario:',
+                currentTime >= normalizedStartTime && currentTime <= normalizedEndTime);
+        }
+
+        console.log('Sistema activo:', isSystemActive());
+        console.log('================================');
     };
 
     // Función para validar si la mesa ya existe
@@ -291,8 +415,8 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
 
     const todayStations = getTodayStations();
 
-    // Obtener estado del sistema
-    const systemActive = isSystemActive();
+    // Obtener estado del sistema - usar la configuración adaptada
+    const systemActive = adaptedConfig ? isSystemActive() : false;
 
     return (
         <div className="bg-white rounded-lg shadow">
@@ -319,8 +443,8 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                                 setShowCreateModal(true);
                             }}
                             className={`px-4 py-2 rounded-md text-sm ${systemActive
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                 }`}
                             disabled={!systemActive}
                         >
@@ -331,8 +455,8 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                                 <button
                                     onClick={openAllStations}
                                     className={`px-4 py-2 rounded-md text-sm ${systemActive
-                                            ? 'bg-green-600 text-white hover:bg-green-700'
-                                            : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                        ? 'bg-green-600 text-white hover:bg-green-700'
+                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                         }`}
                                     disabled={!systemActive}
                                 >
@@ -455,8 +579,8 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                             <button
                                 onClick={handleCreateStation}
                                 className={`px-4 py-2 rounded-md ${systemActive
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                     }`}
                                 disabled={!systemActive}
                             >
@@ -701,10 +825,10 @@ export default function PollingStations({ pollingStations, onToggleStation, onAd
                                         <button
                                             onClick={() => handleToggleStation(station.id)}
                                             className={`px-3 py-1 rounded text-xs font-semibold ${station.isOpen
-                                                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                                    : systemActive
-                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                : systemActive
+                                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                 }`}
                                             disabled={!station.isOpen && !systemActive}
                                         >
