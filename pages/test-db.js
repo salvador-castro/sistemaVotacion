@@ -10,7 +10,7 @@ export default function TestDB() {
       try {
         const response = await fetch('/api/test-db');
         const data = await response.json();
-        
+
         if (data.success) {
           setMessage(data.message);
           setUsers(data.users || []);
@@ -29,7 +29,7 @@ export default function TestDB() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">Prueba de Base de Datos</h1>
       <p className="mb-4">{message}</p>
-      
+
       {users.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-2">Usuarios del sistema:</h2>

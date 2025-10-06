@@ -10,7 +10,7 @@ export default function Vote() {
     // TEMPORAL: Deshabilitar verificación por ahora
     setUser({
       dni: 'presidente',
-      role: 'president', 
+      role: 'president',
       nombre: 'Presidente',
       apellido: 'Mesa'
     });

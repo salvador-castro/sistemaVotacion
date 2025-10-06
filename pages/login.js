@@ -20,7 +20,7 @@ export default function Login() {
           apellido: 'Sistema',
           role: 'super_admin'
         };
-        
+
         localStorage.setItem('user', JSON.stringify(userData));
         window.location.href = '/admin';
       } else {

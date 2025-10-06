@@ -3,7 +3,7 @@ import { authenticateUser } from '../../../lib/auth';
 
 export default async function handler(req, res) {
   console.log('🔐 Login API called');
-  
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
@@ -21,19 +21,19 @@ export default async function handler(req, res) {
 
     if (result.success) {
       console.log('✅ Login exitoso, estableciendo cookie...');
-      
+
       // Configurar cookie
       res.setHeader('Set-Cookie', `token=${result.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800`);
-      
-      res.status(200).json({ 
-        success: true, 
-        user: result.user 
+
+      res.status(200).json({
+        success: true,
+        user: result.user
       });
     } else {
       console.log('❌ Login fallido:', result.error);
-      res.status(401).json({ 
-        success: false, 
-        error: result.error 
+      res.status(401).json({
+        success: false,
+        error: result.error
       });
     }
   } catch (error) {

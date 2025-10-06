@@ -7,6 +7,14 @@ export default function VotersManagement({ voters, onToggleStatus, onClearVoters
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   };
 
+  const handleToggleStatus = (voterId) => {
+    onToggleStatus(voterId);
+  };
+
+  const handleClearVoters = () => {
+    onClearVoters();
+  };
+
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6 border-b">
@@ -35,7 +43,7 @@ export default function VotersManagement({ voters, onToggleStatus, onClearVoters
           </div>
         </div>
       </div>
-      
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -61,31 +69,28 @@ export default function VotersManagement({ voters, onToggleStatus, onClearVoters
                   {voter.especialidad}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                    voter.enabled 
-                      ? 'bg-green-100 text-green-800' 
+                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${voter.enabled
+                      ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
-                  }`}>
+                    }`}>
                     {voter.enabled ? '✅ Habilitado' : '❌ Inhabilitado'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                    voter.voted 
-                      ? 'bg-blue-100 text-blue-800' 
+                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${voter.voted
+                      ? 'bg-blue-100 text-blue-800'
                       : 'bg-yellow-100 text-yellow-800'
-                  }`}>
+                    }`}>
                     {voter.voted ? '✅ Ya votó' : '⏳ Pendiente'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
                     onClick={() => onToggleStatus(voter.id)}
-                    className={`px-4 py-2 rounded text-sm font-semibold ${
-                      voter.enabled 
-                        ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                    className={`px-4 py-2 rounded text-sm font-semibold ${voter.enabled
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
                         : 'bg-green-100 text-green-700 hover:bg-green-200'
-                    }`}
+                      }`}
                   >
                     {voter.enabled ? 'Inhabilitar' : 'Habilitar'}
                   </button>
